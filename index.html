@@ -2221,6 +2221,7 @@
                 { id: 'sells', icon: 'fa-coins', label: t('sells') },
                 { id: 'wds', icon: 'fa-money-bill-transfer', label: t('wds') }, 
                 { id: 'manual', icon: 'fa-users', label: t('users') },
+                { id: 'support', icon: 'fa-headset', label: 'Live Chat' },
                 { id: 'set', icon: 'fa-cog', label: t('set') }
             ];
 
@@ -2229,6 +2230,7 @@
                 { id: 'sells', icon: 'fa-coins', label: t('sells') },
                 { id: 'wds', icon: 'fa-money-bill-transfer', label: t('wds') },
                 { id: 'manual', icon: 'fa-users', label: t('users') },
+                { id: 'support', icon: 'fa-headset', label: 'Live Chat' },
                 { id: 'set', icon: 'fa-cog', label: t('set') }
             ];
             
@@ -2259,6 +2261,7 @@
             let contentHtml = '';
             if(state.adminTab === 'dash') contentHtml = renderAdminDash(); else if(state.adminTab === 'sells') contentHtml = renderAdminSells();
             else if(state.adminTab === 'wds') contentHtml = renderAdminWds(); else if(state.adminTab === 'manual') contentHtml = renderAdminManual();
+            else if(state.adminTab === 'support') contentHtml = renderAdminSupport();
             else if(state.adminTab === 'set') contentHtml = renderAdminSettings();
 
             return `
@@ -2396,15 +2399,20 @@
                 </button>
             </div>`;
 
+            let openTickets = (tickets || []).filter(t => t.status === 'open').length;
+
             let shortcutBtns = `
             <div class="grid grid-cols-2 gap-3 mb-2 mt-4 pt-4 border-t border-[var(--border-color)]">
                 <button onclick="state.adminTab='sells'; state.adminSellTab='daily'; renderApp();" class="glass-panel p-3 rounded-2xl text-center border-t-2 border-[var(--accent-gold)] hover:-translate-y-1 transition-all duration-300 shadow-sm active:scale-95 flex flex-col items-center justify-center gap-2">
                     <i class="fa-solid fa-calendar-day text-[var(--accent-gold)] text-2xl drop-shadow-md"></i>
                     <span class="text-[10px] font-black text-white uppercase tracking-widest leading-tight">Today's<br>Summary</span>
                 </button>
-                <button onclick="state.adminTab='sells'; state.adminSellTab='daily'; renderApp(); setTimeout(()=>window.scrollTo({top:9999, behavior:'smooth'}), 100);" class="glass-panel p-3 rounded-2xl text-center border-t-2 border-[#9b59b6] hover:-translate-y-1 transition-all duration-300 shadow-sm active:scale-95 flex flex-col items-center justify-center gap-2">
-                    <i class="fa-solid fa-box-archive text-[#9b59b6] text-2xl drop-shadow-md"></i>
-                    <span class="text-[10px] font-black text-white uppercase tracking-widest leading-tight">Old<br>History</span>
+                <button onclick="state.adminTab='support'; renderApp();" class="glass-panel p-3 rounded-2xl text-center border-t-2 border-[#9b59b6] hover:-translate-y-1 transition-all duration-300 shadow-sm active:scale-95 flex flex-col items-center justify-center gap-2">
+                    <div class="relative inline-block">
+                        <i class="fa-solid fa-headset text-[#9b59b6] text-2xl drop-shadow-md"></i>
+                        ${openTickets > 0 ? `<span class="absolute -top-2 -right-3 bg-[var(--error)] text-white text-[10px] px-1.5 py-0.5 rounded-full font-black shadow-md border-2 border-[var(--bg-card)]">${openTickets}</span>` : ''}
+                    </div>
+                    <span class="text-[10px] font-black text-white uppercase tracking-widest leading-tight">Live<br>Chat</span>
                 </button>
                 <button onclick="openLifetimeStats()" class="glass-panel p-3 rounded-2xl text-center border-t-2 border-[var(--accent-cyan)] hover:-translate-y-1 transition-all duration-300 shadow-sm active:scale-95 flex flex-col items-center justify-center gap-2 col-span-2">
                     <i class="fa-solid fa-chart-line text-[var(--accent-cyan)] text-2xl drop-shadow-md"></i>
@@ -3082,7 +3090,6 @@
         }
 
         function renderAdminSupport() {
-            // Function maintained minimally as requested, even though it's hidden from the menu
             if(state.activeTicketId) return renderActiveTicket(state.activeTicketId, 'admin');
             
             let html = tickets.sort((a,b) => (b.lastUpdated||0) - (a.lastUpdated||0)).map(tk => {
@@ -3093,7 +3100,7 @@
                 
                 return `
                 <div onclick="state.activeTicketId='${tk.id}'; renderApp()" class="glass-panel p-3 rounded-xl mb-3 cursor-pointer hover:border-[var(--accent-cyan)] transition flex items-center gap-3 shadow-sm hover:-translate-y-0.5">
-                    <img src="${dp}" class="w-12 h-12 rounded-full border-2 border-[var(--accent-gold)] object-cover shadow-sm">
+                    <img src="${dp}" onclick="event.stopPropagation(); openUserManage('${tk.userId}')" title="Click to view profile" class="w-12 h-12 rounded-full border-2 border-[var(--accent-gold)] object-cover shadow-sm hover:scale-110 transition z-10">
                     <div class="flex-1 overflow-hidden">
                         <div class="flex justify-between items-center mb-1"><h4 class="font-black text-sm text-white">${u.name}</h4>${badge}</div>
                         <p class="text-[10px] text-[var(--text-muted)] font-mono mb-1">@${u.username}</p>
@@ -3102,7 +3109,7 @@
                 </div>`;
             }).join('');
             
-            return html || `<p class="text-center text-[var(--text-muted)] text-[10px] py-6 border border-dashed border-[var(--border-color)] rounded-xl">No active user chats found.</p>`;
+            return `<div class="mb-4 flex items-center justify-between"><h2 class="text-lg font-black text-white"><i class="fa-solid fa-headset text-[var(--accent-cyan)]"></i> User Live Chats</h2></div>` + (html || `<p class="text-center text-[var(--text-muted)] text-[10px] py-6 border border-dashed border-[var(--border-color)] rounded-xl">No active user chats found.</p>`);
         }
 
         function renderAdminSettings() {
@@ -3488,7 +3495,7 @@
             if(role === 'admin') {
                 let u = users.find(x => x.id === tk.userId) || { name: tk.userName, username: 'unknown', profilePic: '' };
                 let dp = u.profilePic || `https://placehold.co/100x100/122B45/35D9F2?text=${u.name.substring(0,1).toUpperCase()}`;
-                headerInfo = `<div class="flex items-center gap-3"><img src="${dp}" class="w-10 h-10 rounded-full border-2 border-[var(--accent-gold)] object-cover shadow-sm"><div><h2 class="text-sm font-black text-white">${u.name}</h2><p class="text-[9px] text-[var(--accent-cyan)] font-mono">@${u.username}</p></div></div><button onclick="markAdminChatDone('${tk.id}')" class="ml-auto bg-[var(--bg-main)] text-[var(--success)] hover:bg-[var(--success)] hover:text-white px-3 py-1.5 rounded-lg border border-[var(--success)]/30 text-[10px] font-black transition"><i class="fa-solid fa-check-double"></i> Mark Done</button>`;
+                headerInfo = `<div class="flex items-center gap-3 cursor-pointer group" onclick="openUserManage('${tk.userId}')" title="View User Profile"><img src="${dp}" class="w-10 h-10 rounded-full border-2 border-[var(--accent-gold)] object-cover shadow-sm group-hover:scale-110 transition"><div><h2 class="text-sm font-black text-white group-hover:text-[var(--accent-cyan)] transition">${u.name} <i class="fa-solid fa-up-right-from-square text-[10px] opacity-50 ml-1"></i></h2><p class="text-[9px] text-[var(--accent-cyan)] font-mono">@${u.username}</p></div></div><button onclick="markAdminChatDone('${tk.id}')" class="ml-auto bg-[var(--bg-main)] text-[var(--success)] hover:bg-[var(--success)] hover:text-white px-3 py-1.5 rounded-lg border border-[var(--success)]/30 text-[10px] font-black transition"><i class="fa-solid fa-check-double"></i> Mark Done</button>`;
             } else {
                 headerInfo = `<h2 class="text-lg font-black text-white"><i class="fa-solid fa-headset text-[var(--accent-cyan)]"></i> Support Center</h2>`;
             }
