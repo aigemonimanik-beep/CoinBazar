@@ -1012,7 +1012,7 @@
         async function setupFCMToken() {
             try {
                 // VAPID Key: ফায়ারবেস কনসোল থেকে Key বের করে নিচে বসাবেন
-                const currentToken = await messaging.getToken({ vapidKey: "YOUR_VAPID_KEY_HERE" });
+                const currentToken = await messaging.getToken({ vapidKey: "BA0nH3cRdYtAtRK_dBNrJEss7FU7hM21JWQlC-duIRRfj4IVXyTqDPXxJK-e5SJjdQMIVfaTyhEUtKX_HiDYf3M" });
                 if (currentToken && currentUser) {
                     await db.collection('cb_users').doc(currentUser.id).update({ fcmToken: currentToken });
                 }
