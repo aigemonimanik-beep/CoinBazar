@@ -1029,10 +1029,23 @@
         function sendTelegramAlert(message) {
             if(!tgBotToken || !tgChatId) return;
             const url = `https://api.telegram.org/bot${tgBotToken}/sendMessage`;
+            
+            // লাইভ ওয়েবসাইটের অ্যাডমিন লিংক তৈরি করা হচ্ছে
+            let hostUrl = window.location.href.split('?')[0].split('#')[0];
+            if (hostUrl.startsWith('file:')) hostUrl = "https://aigemonimanik-beep.github.io/";
+            const adminUrl = hostUrl.includes('?') ? hostUrl + "&admin" : hostUrl + "?admin";
+            
             fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: tgChatId, text: message, parse_mode: "HTML" })
+                body: JSON.stringify({ 
+                    chat_id: tgChatId, 
+                    text: message, 
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: [[{ text: "💻 Open Admin Panel", url: adminUrl }]]
+                    }
+                })
             }).catch(err => console.error("Telegram error:", err));
         }
 
@@ -2289,8 +2302,8 @@
             state.selCoinId = null; 
             hideLoading();
             
-            // টেলিগ্রামে মেসেজ পাঠানো হচ্ছে
-            sendTelegramAlert(`🚨 <b>New Sell Request!</b>\n\n👤 User: ${currentUser.name} (@${currentUser.username})\n🪙 Coin: ${k}K ${c.name}\n💰 Value: ৳${receive}\n\nPlease check the Admin Panel.`);
+            // টেলিগ্রামে মেসেজ পাঠানো হচ্ছে (ID এক ক্লিকে কপি হবে)
+            sendTelegramAlert(`🚨 <b>New Sell Request!</b>\n\n🆔 ID: <code>${newOrder.id}</code>\n👤 User: <code>${currentUser.name}</code> (@${currentUser.username})\n🪙 Coin: ${k}K ${c.name}\n💰 Value: ৳${receive}\n\n<i>(Tap ID to copy, then Track Order)</i>`);
             
             let defaultMsg = "আপনার রিকোয়েস্ট সফলভাবে এডমিনের কাছে পাঠানো হয়েছে। এডমিন চেক করে ব্যালেন্স এড করে দিবেন।";
             showSuccessModal(settings.sellSuccessMsg || defaultMsg); 
@@ -2512,8 +2525,8 @@
             await db.collection('cb_orders').doc(newWd.id).set(newWd);
             closeWdModal(); 
             
-            // টেলিগ্রামে মেসেজ পাঠানো হচ্ছে
-            sendTelegramAlert(`🚨 <b>New Withdraw Request!</b>\n\n👤 User: ${currentUser.name} (@${currentUser.username})\n🏦 Method: ${m.name}\n📞 Acc: ${acc}\n💸 Amount: ৳${amt}\n\nPlease check the Admin Panel.`);
+            // টেলিগ্রামে মেসেজ পাঠানো হচ্ছে (ID ও Number এক ক্লিকে কপি হবে)
+            sendTelegramAlert(`🚨 <b>New Withdraw Request!</b>\n\n🆔 ID: <code>${newWd.id}</code>\n👤 User: <code>${currentUser.name}</code> (@${currentUser.username})\n🏦 Method: ${m.name}\n📞 Acc: <code>${acc}</code>\n💸 Amount: ৳${amt}\n\n<i>(Tap ID or Acc to copy)</i>`);
             
             let defaultMsg = "আপনার উইথড্র রিকোয়েস্ট সফলভাবে পাঠানো হয়েছে। এডমিন চেক করে পেমেন্ট করে দিবেন।";
             showSuccessModal(settings.wdSuccessMsg || defaultMsg); 
