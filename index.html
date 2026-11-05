@@ -454,8 +454,10 @@
                 <!-- Core Navigation -->
                 <button onclick="handleMenuNav('home')" class="w-full text-left p-3 rounded-xl text-xs font-black text-[var(--text-muted)] hover:bg-[var(--bg-sidebar)] hover:text-white flex items-center gap-3 transition"><i class="fa-solid fa-house w-5 text-center text-[var(--accent-cyan)]"></i> Home Dashboard</button>
                 <button onclick="state.selCoinId=null; handleMenuNav('home'); setTimeout(()=>document.getElementById('coin-select-section').scrollIntoView({behavior: 'smooth', block: 'start'}), 300)" class="w-full text-left p-3 rounded-xl text-xs font-black text-[var(--text-muted)] hover:bg-[var(--bg-sidebar)] hover:text-white flex items-center gap-3 transition"><i class="fa-solid fa-coins w-5 text-center text-[var(--accent-gold)]"></i> Sell Coin</button>
+                <button onclick="toggleMobileMenu(); openWdModal();" class="w-full text-left p-3 rounded-xl text-xs font-black text-[var(--text-muted)] hover:bg-[var(--bg-sidebar)] hover:text-white flex items-center gap-3 transition"><i class="fa-solid fa-money-bill-transfer w-5 text-center text-[var(--error)]"></i> Withdraw Funds</button>
                 <button onclick="handleMenuNav('history')" class="w-full text-left p-3 rounded-xl text-xs font-black text-[var(--text-muted)] hover:bg-[var(--bg-sidebar)] hover:text-white flex items-center gap-3 transition"><i class="fa-solid fa-chart-pie w-5 text-center text-[var(--success)]"></i> Dashboard & History</button>
                 <button onclick="handleMenuNav('profile')" class="w-full text-left p-3 rounded-xl text-xs font-black text-[var(--text-muted)] hover:bg-[var(--bg-sidebar)] hover:text-white flex items-center gap-3 transition"><i class="fa-solid fa-user-gear w-5 text-center text-[#9b59b6]"></i> My Profile</button>
+                <button onclick="handleMenuNav('support')" class="w-full text-left p-3 rounded-xl text-xs font-black text-[var(--text-muted)] hover:bg-[var(--bg-sidebar)] hover:text-white flex items-center gap-3 transition"><i class="fa-solid fa-headset w-5 text-center text-[var(--accent-cyan)]"></i> Live Chat / Support</button>
                 
                 <div class="my-2 border-t border-[var(--border-color)]"></div>
                 
@@ -3524,4 +3526,4 @@
         }
     </script>
 </body>
-                      </html>
+</html>
