@@ -36,6 +36,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     
     <!-- Confetti Animation Library -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -201,6 +202,7 @@
         }
         
         const auth = firebase.auth();
+        const messaging = firebase.messaging();
 
         auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
             .catch((error) => console.error("Auth persistence error:", error));
@@ -282,6 +284,7 @@
         const notifAudio = new Audio('https://www.soundjay.com/phone/sounds/telephone-ring-03a.mp3');
         notifAudio.loop = true; // একটানা বেজেই চলবে যতক্ষণ না আপনি ধরছেন!
         let stopNotifTimeout = null;
+        notifAudio.primed = false; // Background Audio Bypass Flag
 
         // URL Check for Admin
         const isAdminUrl = window.location.href.includes('?admin') || window.location.href.includes('&admin');
@@ -600,6 +603,14 @@
     <!-- Toast -->
     <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 glass-panel text-white px-6 py-3 rounded-xl font-bold shadow-2xl opacity-0 pointer-events-none transition-all duration-300 z-[400] border-l-4 border-l-[var(--accent-cyan)] text-sm whitespace-nowrap text-center"></div>
 
+    <!-- Admin Alarm Mode Overlay -->
+    <div id="alarm-mode-overlay" class="fixed inset-0 bg-black z-[9999] hidden flex-col items-center justify-center text-center cursor-pointer" onclick="stopAlarmMode()">
+        <i class="fa-solid fa-bell text-6xl text-[var(--accent-gold)] animate-pulse mb-6"></i>
+        <h2 class="text-2xl font-black text-white mb-2 tracking-widest uppercase">Alarm Mode Active</h2>
+        <p class="text-sm text-[#A8B8CC] font-bold mb-8 max-w-[80%] mx-auto leading-relaxed">আপনার ফোন এখন স্লিপ হবে না। নতুন রিকোয়েস্ট আসলে সাথে সাথে অ্যালার্ম বাজবে!<br><br><span class="text-[#35D9F2]">ফিরে যেতে স্ক্রিনে ক্লিক করুন</span></p>
+        <div class="text-[var(--accent-cyan)] font-mono text-2xl font-black border border-[var(--accent-cyan)]/30 px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(53,217,242,0.2)] bg-[#071426]" id="alarm-clock">00:00:00</div>
+    </div>
+
     <!-- Hidden Receipt Template for PDF Generation -->
     <div id="receipt-template" class="fixed top-[-9999px] left-[-9999px] bg-white text-black p-8 w-[600px] font-sans z-[-1000]">
         <div class="border-b-2 border-gray-300 pb-4 mb-4 flex justify-between items-center">
@@ -668,6 +679,20 @@
         // Global click listener for UI audio initialization ONLY
         document.addEventListener('click', (e) => {
             initAudio(); // initialize on first user interaction
+            
+            // Background Audio Priming Trick (বাইপাস করার জন্য)
+            if (!notifAudio.primed) {
+                notifAudio.muted = true; // প্রথমে মিউট করে প্লে করবো
+                let playPromise = notifAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        notifAudio.pause();
+                        notifAudio.currentTime = 0;
+                        notifAudio.muted = false; // আবার আনমিউট করে দেবো
+                        notifAudio.primed = true;
+                    }).catch(err => console.log("Prime failed", err));
+                }
+            }
         });
 
         // ================= PDF RECEIPT GENERATOR =================
@@ -974,9 +999,32 @@
 
         function requestNotificationPermission() {
             if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-                Notification.requestPermission();
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        setupFCMToken();
+                    }
+                });
+            } else if (Notification.permission === 'granted') {
+                setupFCMToken();
             }
         }
+        
+        async function setupFCMToken() {
+            try {
+                // VAPID Key: ফায়ারবেস কনসোল থেকে Key বের করে নিচে বসাবেন
+                const currentToken = await messaging.getToken({ vapidKey: "YOUR_VAPID_KEY_HERE" });
+                if (currentToken && currentUser) {
+                    await db.collection('cb_users').doc(currentUser.id).update({ fcmToken: currentToken });
+                }
+            } catch (err) {
+                console.log('Error getting FCM token:', err);
+            }
+        }
+
+        messaging.onMessage((payload) => {
+            showPushNotification(payload.notification.title, payload.notification.body);
+        });
+
         function showPushNotification(title, body) {
             showToast(`🔔 ${title}: ${body}`, 'success');
             
@@ -1006,7 +1054,10 @@
         }
         function playNotifSound() {
             try { 
-                notifAudio.play().catch(e=>console.log("Audio play blocked by browser")); 
+                let playPromise = notifAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => console.log("Audio play blocked by browser. User must interact first."));
+                }
                 
                 // কাস্টম ডিউরেশন অনুযায়ী সাউন্ড থামানো
                 if (stopNotifTimeout) clearTimeout(stopNotifTimeout);
@@ -2607,6 +2658,13 @@
                 </div>
             </div>`;
 
+            let alarmBtnHtml = `
+            <div class="glass-panel p-4 rounded-2xl mb-5 shadow-lg border border-[var(--accent-gold)] bg-[var(--accent-gold)]/5 flex flex-col items-center text-center">
+                <h3 class="text-sm font-black text-[var(--accent-gold)] mb-1 flex items-center gap-2"><i class="fa-solid fa-bell"></i> 100% Guaranteed Notification</h3>
+                <p class="text-[9px] text-[var(--text-muted)] mb-3 font-bold">ফোন স্ক্রিন অফ হয়ে গেলে ব্রাউজার নোটিফিকেশন দেয় না। গ্যারান্টি সহ রিংটোন বাজাতে নিচের মোডটি অন করে ফোন পকেটে রাখুন।</p>
+                <button onclick="startAlarmMode()" class="w-full gold-btn py-3.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-md flex items-center justify-center gap-2 active:scale-95"><i class="fa-solid fa-power-off"></i> Start Alarm Mode</button>
+            </div>`;
+
             let actionBtnsHtml = `
             <div class="grid grid-cols-2 gap-3 mb-5 mt-2">
                 <button onclick="state.adminTab='sells'; state.adminSellTab='pending'; renderApp()" class="glass-panel p-5 rounded-2xl text-center border-t-2 border-[var(--success)] hover:-translate-y-1 transition-all duration-300 shadow-sm hover:shadow-[0_8px_25px_rgba(22,199,132,0.15)] flex flex-col items-center justify-center gap-3 active:scale-95">
@@ -2646,7 +2704,7 @@
                 </button>
             </div>`;
 
-            return pendingBoardHtml + siteStatusHtml + trackBoxHtml + actionBtnsHtml + shortcutBtns;
+            return pendingBoardHtml + siteStatusHtml + trackBoxHtml + alarmBtnHtml + actionBtnsHtml + shortcutBtns;
         }
 
         // --- Admin History Modal & Delete Functions ---
@@ -3780,6 +3838,57 @@
                 state.activeTicketId = null;
                 renderApp();
             }
+        }
+
+        // ================= ADMIN ALARM MODE (100% GUARANTEE TRICK) =================
+        let wakeLock = null;
+        let alarmClockInterval = null;
+        
+        async function startAlarmMode() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+                
+                let overlay = document.getElementById('alarm-mode-overlay');
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+                
+                try { document.documentElement.requestFullscreen(); } catch(e){}
+                
+                // Play silent audio to unlock audio context firmly
+                notifAudio.muted = true;
+                let playPromise = notifAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        notifAudio.pause();
+                        notifAudio.muted = false;
+                        notifAudio.primed = true;
+                    }).catch(e=>{});
+                }
+                
+                showToast("Alarm Mode is Active!", "success");
+                
+                alarmClockInterval = setInterval(() => {
+                    let now = new Date();
+                    document.getElementById('alarm-clock').innerText = now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                }, 1000);
+                
+            } catch (err) {
+                showToast("Browser prevented Screen Lock. Keep screen ON manually.", "error");
+            }
+        }
+        
+        function stopAlarmMode() {
+            if (wakeLock !== null) {
+                wakeLock.release().then(() => wakeLock = null).catch(()=>{});
+            }
+            let overlay = document.getElementById('alarm-mode-overlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            
+            try { document.exitFullscreen(); } catch(e){}
+            if(alarmClockInterval) clearInterval(alarmClockInterval);
         }
     </script>
 </body>
