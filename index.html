@@ -7,6 +7,28 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Coin Bazar | Premium</title>
+    
+    <!-- PWA Manifest & App Install Logic -->
+    <script>
+        const manifestStr = JSON.stringify({
+            "name": "Coin Bazar Premium",
+            "short_name": "Coin Bazar",
+            "start_url": window.location.pathname,
+            "display": "standalone",
+            "background_color": "#071426",
+            "theme_color": "#071426",
+            "icons": [
+                { "src": "https://placehold.co/192x192/122B45/E8C779?text=CB", "sizes": "192x192", "type": "image/png" },
+                { "src": "https://placehold.co/512x512/122B45/E8C779?text=CB", "sizes": "512x512", "type": "image/png" }
+            ]
+        });
+        const manifestBlob = new Blob([manifestStr], {type: 'application/json'});
+        const manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = URL.createObjectURL(manifestBlob);
+        document.head.appendChild(manifestLink);
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -256,7 +278,10 @@
         };
 
         let prevPendingCount = 0;
-        const notifAudio = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
+        // রিয়েল কলের মতো একটানা বাজার জন্য রিংটোন সেট করা হলো
+        const notifAudio = new Audio('https://www.soundjay.com/phone/sounds/telephone-ring-03a.mp3');
+        notifAudio.loop = true; // একটানা বেজেই চলবে যতক্ষণ না আপনি ধরছেন!
+        let stopNotifTimeout = null;
 
         // URL Check for Admin
         const isAdminUrl = window.location.href.includes('?admin') || window.location.href.includes('&admin');
@@ -959,7 +984,7 @@
             if (title.toLowerCase().includes('approved') || title.toLowerCase().includes('paid')) {
                 playSuccessSound(); // For Users when approved
             } else {
-                playNotifSound(); // For Admins on new requests
+                playNotifSound(); // For Admins on new requests (Continuous Ringing)
             }
 
             if ("Notification" in window && Notification.permission === "granted") {
@@ -967,20 +992,44 @@
                     body: body, 
                     icon: settings.logo || 'https://placehold.co/100x100/122B45/E8C779?text=CB',
                     requireInteraction: true, // আপনি নিজে না কাটা পর্যন্ত নোটিফিকেশন স্ক্রিন থেকে যাবে না
-                    vibrate: [500, 250, 500, 250, 500] // ফোন জোরে ভাইব্রেট করবে
+                    vibrate: [1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000] // ফোন একটানা জোরে ভাইব্রেট করবে
                 });
                 
-                // নোটিফিকেশনে ক্লিক করলে সরাসরি ওয়েবসাইটে নিয়ে আসবে
+                // নোটিফিকেশনে ক্লিক করলে সরাসরি ওয়েবসাইটে নিয়ে আসবে এবং রিংটোন থামবে
                 notif.onclick = function(event) {
                     event.preventDefault();
                     window.focus(); 
+                    stopNotifSound();
                     this.close();
                 };
             }
         }
         function playNotifSound() {
-            try { notifAudio.play().catch(e=>console.log("Audio play blocked by browser")); } catch(e){}
+            try { 
+                notifAudio.play().catch(e=>console.log("Audio play blocked by browser")); 
+                
+                // কাস্টম ডিউরেশন অনুযায়ী সাউন্ড থামানো
+                if (stopNotifTimeout) clearTimeout(stopNotifTimeout);
+                let duration = settings.ringDuration !== undefined ? parseInt(settings.ringDuration) : 0;
+                if (duration > 0) {
+                    stopNotifTimeout = setTimeout(() => {
+                        stopNotifSound();
+                    }, duration * 1000);
+                }
+            } catch(e){}
         }
+        function stopNotifSound() {
+            try { 
+                if (stopNotifTimeout) clearTimeout(stopNotifTimeout);
+                notifAudio.pause(); 
+                notifAudio.currentTime = 0; 
+            } catch(e){}
+        }
+
+        // অ্যাডমিন স্ক্রিনে আসলে বা যেকোনো জায়গায় ক্লিক করলেই রিংটোন অটোমেটিক থেমে যাবে
+        window.addEventListener('focus', stopNotifSound);
+        document.addEventListener('click', stopNotifSound);
+        document.addEventListener('touchstart', stopNotifSound);
 
         // --- Core Application Logic & Sync ---
         let unsubGlobal = null; let unsubUsers = null; let unsubOrders = null; let unsubTickets = null; let unsubNotifications = null;
@@ -3392,6 +3441,14 @@
                         </div>
                     </div>
 
+                    <div class="bg-[var(--bg-sidebar)] border border-[var(--border-color)] p-4 rounded-xl flex justify-between items-center shadow-sm mt-3">
+                        <div><div class="text-[11px] font-black text-white">Ring/Vibrate Duration</div><div class="text-[9px] text-[var(--text-muted)] mt-1">কত সেকেন্ড অ্যালার্ম বাজবে (0 = একটানা)</div></div>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="set-ring-duration" value="${settings.ringDuration || 0}" onchange="updateRingDuration(this.value)" class="w-16 input-premium p-1.5 rounded-lg text-xs font-bold text-center border focus:border-[var(--accent-cyan)] shadow-sm">
+                            <span class="text-xs text-[var(--text-muted)] font-bold">Sec</span>
+                        </div>
+                    </div>
+
                     <div class="bg-[var(--bg-sidebar)] border border-[var(--border-color)] p-4 rounded-xl flex flex-col gap-3 shadow-sm mt-3">
                         <div class="flex justify-between items-center">
                             <div><div class="text-[11px] font-black text-white">${t('maint_mode')}</div><div class="text-[9px] text-[var(--text-muted)] mt-1">পুরো ওয়েবসাইট ইউজারদের জন্য বন্ধ রাখুন</div></div>
@@ -3535,6 +3592,15 @@
         }
 
         function toggleAllowDel(val) { settings.allowUserDeletion = val; db.collection('cb_data').doc('global_state').update({ 'settings.allowUserDeletion': val }); showToast(val ? "User Deletion: ENABLED" : "User Deletion: DISABLED"); renderApp(); }
+        
+        function updateRingDuration(val) {
+            let duration = parseInt(val) || 0;
+            if(duration < 0) duration = 0;
+            settings.ringDuration = duration;
+            db.collection('cb_data').doc('global_state').update({ 'settings.ringDuration': duration });
+            showToast(duration === 0 ? "Ring Setting: Continuous" : `Ring Setting: ${duration} Seconds`);
+        }
+
         function toggleMaintenance(val) { settings.maintenanceMode = val; db.collection('cb_data').doc('global_state').update({ 'settings.maintenanceMode': val }); showToast(val ? "Maintenance Mode ON" : "Maintenance Mode OFF"); renderApp(); }
         function toggleReqTg(val) { settings.requireTelegram = val; db.collection('cb_data').doc('global_state').update({ 'settings.requireTelegram': val }); showToast(val ? "Telegram Required: ON" : "Telegram Required: OFF"); }
 
