@@ -3368,6 +3368,7 @@
                 </div>
                 <h4 class="text-[10px] font-black text-[var(--text-muted)] uppercase border-b border-[var(--border-color)] pb-1 mb-3"><i class="fa-solid fa-shield-halved"></i> Account Actions</h4>
                 <div class="flex gap-2 mb-3"><input type="number" id="m-amt-${u.id}" placeholder="Amount" class="w-1/2 input-premium p-2 rounded-lg text-xs font-bold text-center"><button onclick="modManualBal('${u.id}', 'add')" class="btn-modern-success flex-1 rounded-lg font-black text-[10px] shadow-sm">${t('add')}</button><button onclick="modManualBal('${u.id}', 'deduct')" class="btn-modern-danger flex-1 rounded-lg font-black text-[10px] shadow-sm">${t('sub')}</button></div>
+                <button onclick="messageUserFromProfile('${u.id}')" class="w-full py-2.5 rounded-lg text-[11px] font-black border border-[#9b59b6] bg-[#9b59b6]/10 text-[#9b59b6] hover:bg-[#9b59b6] hover:text-white uppercase tracking-wider mb-2 transition shadow-sm"><i class="fa-solid fa-comment-dots"></i> Message User (Live Chat)</button>
                 <button onclick="toggleBlock('${u.id}')" class="w-full py-2.5 rounded-lg text-[11px] font-black border uppercase tracking-wider mb-2 transition shadow-sm ${u.status==='blocked'?'bg-[var(--bg-main)] text-[var(--success)] border-[var(--success)]':'btn-modern-danger'}"><i class="fa-solid ${u.status==='blocked'?'fa-unlock':'fa-lock'}"></i> ${u.status==='blocked'?t('unblock'):t('block')}</button>
                 `;
             } else {
@@ -3392,6 +3393,24 @@
                     ${contentHtml}
                 `;
             }
+        }
+
+        async function messageUserFromProfile(uid) {
+            closeUserManage();
+            state.adminTab = 'support';
+            state.activeTicketId = uid;
+            
+            // Check if ticket exists, if not create one instantly
+            let tk = tickets.find(x => x.id === uid);
+            if (!tk) {
+                let u = users.find(x => x.id === uid);
+                if(u) {
+                    tk = { id: uid, userId: uid, userName: u.name, subject: 'Live Chat Support', status: 'open', time: new Date().toLocaleString(), messages: [], lastUpdated: Date.now() };
+                    await db.collection('cb_tickets').doc(uid).set(tk);
+                }
+            }
+            
+            renderApp();
         }
 
         async function toggleAdminRole(uid) {
