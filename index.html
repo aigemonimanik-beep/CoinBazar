@@ -280,11 +280,20 @@
         };
 
         let prevPendingCount = 0;
-        // রিয়েল কলের মতো একটানা বাজার জন্য রিংটোন সেট করা হলো
-        const notifAudio = new Audio('https://www.soundjay.com/phone/sounds/telephone-ring-03a.mp3');
-        notifAudio.loop = true; // একটানা বেজেই চলবে যতক্ষণ না আপনি ধরছেন!
+        
+        // NEW: 100% Guaranteed Web Audio API Beeper (No external file needed)
+        let audioCtx = null;
+        let beepInterval = null;
         let stopNotifTimeout = null;
-        notifAudio.primed = false; // Background Audio Bypass Flag
+
+        function initWebAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
 
         // URL Check for Admin
         const isAdminUrl = window.location.href.includes('?admin') || window.location.href.includes('&admin');
@@ -679,20 +688,8 @@
         // Global click listener for UI audio initialization ONLY
         document.addEventListener('click', (e) => {
             initAudio(); // initialize on first user interaction
-            
-            // Background Audio Priming Trick (বাইপাস করার জন্য)
-            if (!notifAudio.primed) {
-                notifAudio.muted = true; // প্রথমে মিউট করে প্লে করবো
-                let playPromise = notifAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        notifAudio.pause();
-                        notifAudio.currentTime = 0;
-                        notifAudio.muted = false; // আবার আনমিউট করে দেবো
-                        notifAudio.primed = true;
-                    }).catch(err => console.log("Prime failed", err));
-                }
-            }
+            initWebAudio(); // Unlock background beeper context
+            stopNotifSound(); // Stop ringing if user clicks anywhere
         });
 
         // ================= PDF RECEIPT GENERATOR =================
@@ -1053,28 +1050,47 @@
             }
         }
         function playNotifSound() {
-            try { 
-                let playPromise = notifAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(e => console.log("Audio play blocked by browser. User must interact first."));
-                }
+            initWebAudio();
+            if (beepInterval) return; // Already ringing
+            
+            // Create a loud digital alarm sound directly from the browser
+            const playBeep = () => {
+                if(!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch tone
+                osc.frequency.setValueAtTime(1100, audioCtx.currentTime + 0.1); // Two-tone effect
                 
-                // কাস্টম ডিউরেশন অনুযায়ী সাউন্ড থামানো
-                if (stopNotifTimeout) clearTimeout(stopNotifTimeout);
-                let duration = settings.ringDuration !== undefined ? parseInt(settings.ringDuration) : 0;
-                if (duration > 0) {
-                    stopNotifTimeout = setTimeout(() => {
-                        stopNotifSound();
-                    }, duration * 1000);
-                }
-            } catch(e){}
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime); // LOUD volume
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            };
+
+            playBeep(); // Play immediately
+            beepInterval = setInterval(playBeep, 800); // Repeat every 0.8 seconds (like a phone ringing)
+            
+            // Auto stop logic
+            if (stopNotifTimeout) clearTimeout(stopNotifTimeout);
+            let duration = settings.ringDuration !== undefined ? parseInt(settings.ringDuration) : 0;
+            if (duration > 0) {
+                stopNotifTimeout = setTimeout(stopNotifSound, duration * 1000);
+            }
         }
         function stopNotifSound() {
-            try { 
-                if (stopNotifTimeout) clearTimeout(stopNotifTimeout);
-                notifAudio.pause(); 
-                notifAudio.currentTime = 0; 
-            } catch(e){}
+            if (beepInterval) {
+                clearInterval(beepInterval);
+                beepInterval = null;
+            }
+            if (stopNotifTimeout) {
+                clearTimeout(stopNotifTimeout);
+                stopNotifTimeout = null;
+            }
         }
 
         // অ্যাডমিন স্ক্রিনে আসলে বা যেকোনো জায়গায় ক্লিক করলেই রিংটোন অটোমেটিক থেমে যাবে
@@ -3846,6 +3862,8 @@
         
         async function startAlarmMode() {
             try {
+                initWebAudio(); // Unlock audio context firmly!
+                
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
                 }
@@ -3855,17 +3873,6 @@
                 overlay.classList.add('flex');
                 
                 try { document.documentElement.requestFullscreen(); } catch(e){}
-                
-                // Play silent audio to unlock audio context firmly
-                notifAudio.muted = true;
-                let playPromise = notifAudio.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        notifAudio.pause();
-                        notifAudio.muted = false;
-                        notifAudio.primed = true;
-                    }).catch(e=>{});
-                }
                 
                 showToast("Alarm Mode is Active!", "success");
                 
