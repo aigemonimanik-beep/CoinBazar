@@ -640,13 +640,9 @@
             try { synthError.triggerAttackRelease("C3", "8n", "+0", 0.1); } catch(e){}
         }
         
-        // Global click listener for UI audio
+        // Global click listener for UI audio initialization ONLY
         document.addEventListener('click', (e) => {
             initAudio(); // initialize on first user interaction
-            let target = e.target.closest('button, .cursor-pointer, input[type="radio"], input[type="checkbox"], a, .glass-panel');
-            if (target && !target.closest('.no-sound')) {
-                playClickSound();
-            }
         });
 
         // ================= PDF RECEIPT GENERATOR =================
@@ -855,9 +851,6 @@
 
         // ================= AUTHENTICATION & INITIALIZATION LOGIC =================
         function showToast(msg, type = 'success') {
-            if(type === 'error') playErrorSound();
-            else if(type === 'success') playSuccessSound();
-            
             let t_el = document.getElementById('toast');
             t_el.innerText = msg;
             t_el.style.borderLeftColor = type === 'error' ? 'var(--error)' : 'var(--accent-cyan)';
@@ -961,8 +954,28 @@
         }
         function showPushNotification(title, body) {
             showToast(`🔔 ${title}: ${body}`, 'success');
+            
+            // Play notification sounds based on event
+            if (title.toLowerCase().includes('approved') || title.toLowerCase().includes('paid')) {
+                playSuccessSound(); // For Users when approved
+            } else {
+                playNotifSound(); // For Admins on new requests
+            }
+
             if ("Notification" in window && Notification.permission === "granted") {
-                new Notification("Coin Bazar | " + title, { body: body, icon: settings.logo || 'https://placehold.co/100x100/122B45/E8C779?text=CB' });
+                let notif = new Notification("Coin Bazar | " + title, { 
+                    body: body, 
+                    icon: settings.logo || 'https://placehold.co/100x100/122B45/E8C779?text=CB',
+                    requireInteraction: true, // আপনি নিজে না কাটা পর্যন্ত নোটিফিকেশন স্ক্রিন থেকে যাবে না
+                    vibrate: [500, 250, 500, 250, 500] // ফোন জোরে ভাইব্রেট করবে
+                });
+                
+                // নোটিফিকেশনে ক্লিক করলে সরাসরি ওয়েবসাইটে নিয়ে আসবে
+                notif.onclick = function(event) {
+                    event.preventDefault();
+                    window.focus(); 
+                    this.close();
+                };
             }
         }
         function playNotifSound() {
@@ -1065,7 +1078,6 @@
                 if(currentUser && currentUser.role === 'admin') {
                     let curPending = orders.filter(o => o.status === 'pending' || (o.type === 'wd' && o.status === 'processing')).length;
                     if(!initialOrderLoad && curPending > prevPendingCount) { 
-                        playNotifSound(); 
                         showPushNotification("New Request Alert", "You have new pending requests!");
                     }
                     prevPendingCount = curPending;
@@ -1184,7 +1196,6 @@
         function showSuccessModal(msg) {
             // Magic Confetti Effect!
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#E8C779', '#35D9F2', '#16C784'] });
-            playSuccessSound();
             
             document.getElementById('success-modal-msg').innerText = msg;
             let modal = document.getElementById('success-modal');
